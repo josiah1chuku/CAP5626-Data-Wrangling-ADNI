@@ -1,89 +1,53 @@
-\documentclass[12pt]{article}
+\documentclass[12pt,a4paper]{article}
 \usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage{geometry}
-\usepackage{caption}
-\usepackage{float}
 \usepackage{hyperref}
+\usepackage{titlesec}
 
-\geometry{margin=1in}
-
-% --- Author and Course Information ---
-\title{Project 1: Exploratory Data Analysis, Wrangling, and Feature Engineering on the ADNI Dataset}
-\author{Josiah Chuku \\ 
-\small Institution: Florida A\&M University \\ 
-\small Department of Computer Science}
-\date{February 10, 2026}
+% Title Information
+\title{ADNI Data Exploration, Wrangling, and Feature Engineering}
+\author{Josiah Chuku \\ \small CAP5626 - Introduction to Artificial Intelligence \\ \small Florida A\&M University}
+\date{February 12, 2026}
 
 \begin{document}
 
 \maketitle
 
-\section{Project Overview}
-This technical report details the data preparation and engineering pipeline applied to the ADNI (\texttt{TADPOLE\_D3}) clinical dataset. The objective is to transform 383 high-dimensional features into a clean, scaled, and reduced format suitable for machine learning, while justifying every methodological decision as per the requirements of the course.
+\section{Introduction}
+This report outlines the data preprocessing, cleaning, and feature engineering performed on the Alzheimer's Disease Neuroimaging Initiative (ADNI) dataset. The primary goal of this work is to prepare the \texttt{TADPOLE\_D3(in).csv} dataset (896 observations, 383 features) for subsequent machine learning tasks by addressing data quality issues and reducing dimensionality.
 
-\section{Task 1: Data Cleaning}
-
-\subsection{1.1 Missing Data Analysis}
-The dataset consists of 896 observations. An initial scan revealed significant missing data across several neuroimaging and clinical markers. Figure 1 visualizes the sparsity of the data.
-
-\begin{figure}[H]
-    \centering
-    % Placeholder for your heatmap exported from Colab
-    \includegraphics[width=0.8\textwidth]{missing_heatmap.png} 
-    \caption{Heatmap of missing data across 383 features (Yellow indicates missing values).}
-\end{figure}
-
-\textbf{Justification for Decision:} 
+\section{Exploratory Data Analysis (EDA)}
+Initial analysis revealed significant missingness in biomarker data and neuroimaging volumes. 
 \begin{itemize}
-    \item \textbf{Dropping Columns:} Features with $>50\%$ missing data were removed. Retaining these would require extreme imputation, which risks introducing significant bias and "hallucinated" patterns.
-    \item \textbf{Median Imputation:} For the remaining numerical features, \textbf{Median Imputation} was chosen over Mean Imputation. Clinical data (like brain volumes) often contain outliers; the median is more robust and prevents extreme values from skewing the representative center of the distribution.
+    \item \textbf{Missing Data:} A heatmap was generated to visualize the sparsity of features. Brain volume measurements showed high rates of missingness, requiring an imputation strategy.
+    \item \textbf{Target Distribution:} The distribution of diagnoses (DX) was analyzed to identify potential class imbalances.
 \end{itemize}
 
-\subsection{1.2 Incorrect Data Handling}
-Impossible values were detected in the neuroimaging columns (prefix \texttt{ST}).
+\section{Data Cleaning and Preprocessing}
+\subsection{Imputation and Outliers}
+Biological data often contains noise and missing entries. The following decisions were made:
 \begin{itemize}
-    \item \textbf{Detection:} Logic was implemented to find non-positive values ($\le 0$) in brain volume columns, which are biologically impossible.
-    \item \textbf{Action:} These values were treated as "garbage data," converted to NaNs, and handled via the imputation pipeline to ensure algorithmic stability.
+    \item \textbf{Median Imputation:} Critical brain volumes were imputed using the median rather than the mean to remain robust against outliers.
+    \item \textbf{Data Integrity:} Records with negative ages or impossible physiological volumes were flagged and treated as missing.
+    \item \textbf{Feature Removal:} Administrative columns such as \texttt{RID} and \texttt{SITE} were dropped as they provide no predictive physiological value.
 \end{itemize}
 
-\subsection{1.3 Unnecessary Data}
-Features such as \texttt{RID}, \texttt{PTID}, \texttt{SITE}, and \texttt{EXAMDATE} were identified as unnecessary. While useful for database management, these are unique identifiers that do not represent generalizable biological patterns. Including them would lead the model to "memorize" specific patients rather than learn predictive features.
+\subsection{Feature Engineering}
+\begin{itemize}
+    \item \textbf{Encoding:} Categorical variables (e.g., PTGENDER, DX) were transformed using One-Hot Encoding to allow for mathematical processing without implying an ordinal relationship.
+    \item \textbf{Scaling:} Z-score standardization (\texttt{StandardScaler}) was applied to all numeric features. This ensures that features with large ranges, such as \texttt{WholeBrain} volume, do not disproportionately influence the model compared to smaller-scale features like \texttt{Age}.
+\end{itemize}
 
-\section{Task 2: Feature Engineering}
+\section{Dimensionality Reduction}
+To address the \textit{Curse of Dimensionality}, Principal Component Analysis (PCA) was implemented.
+\begin{itemize}
+    \item \textbf{Variance Capture:} The high-dimensional feature space (383 features) was reduced to 2 principal components.
+    \item \textbf{Visualization:} The resulting 2D plot illustrated emerging clusters corresponding to different diagnostic groups, demonstrating that significant variance is captured even in a reduced space.
+\end{itemize}
 
-\subsection{2.1 Encoding Categorical Features}
-The categorical features (e.g., \texttt{DX} for Diagnosis) were processed using \textbf{One-Hot Encoding}. 
-\textbf{Justification:} Diagnosis is a nominal category. Using Ordinal Encoding (1, 2, 3) would incorrectly imply that one diagnosis is mathematically "greater" than another. One-Hot Encoding creates binary columns, allowing the model to treat each state independently, though it slightly increases dimensionality.
-
-\subsection{2.2 Scaling Comparison and Selection}
-Scaling was performed on a sample of 50 observations for three features: \texttt{AGE}, \texttt{PTEDUCAT}, and \texttt{ADAS13}.
-
-\begin{figure}[H]
-    \centering
-    % Placeholder for your boxplot comparison
-    \includegraphics[width=0.9\textwidth]{scaling_comparison.png}
-    \caption{Comparison of Raw, Normalized (Min-Max), and Standardized (Z-score) values.}
-\end{figure}
-
-\textbf{Justification:} \textbf{Standardization (Z-score)} was selected as the final method. Unlike Normalization, which squashes data into a $0-1$ range, Standardization centers the data at a mean of $0$ with unit variance. This is essential for the Principal Component Analysis performed in the next step.
-
-\section{Task 3: Dimensionality Reduction}
-
-\subsection{3.1 The Curse of Dimensionality}
-The ADNI dataset suffers from the \textit{Curse of Dimensionality}. With 383 features, the "volume" of the feature space is vast, making the 896 data points extremely sparse. This sparsity increases the risk of overfitting, as models can easily find random noise that appears to be a trend.
-
-\subsection{3.2 Principal Component Analysis (PCA)}
-PCA was implemented to project the high-dimensional space into two components.
-
-\begin{figure}[H]
-    \centering
-    % Placeholder for your PCA scatter plot
-    \includegraphics[width=0.7\textwidth]{pca_plot.png}
-    \caption{2D Visualization of the ADNI dataset after PCA dimensionality reduction.}
-\end{figure}
-
-\textbf{Conceptual Explanation:} PCA works by rotating the coordinate axes to align with the directions of maximum variance (Principal Components). By keeping only the first two components, we retain the majority of the "information" while discarding redundant or highly correlated dimensions, effectively mitigating the curse of dimensionality.
+\section{Conclusion}
+The preprocessing pipeline successfully transformed raw ADNI data into a clean, scaled feature matrix. By addressing missingness through median imputation and mitigating redundancy via PCA, the dataset is now optimized for classification models. Future work will explore longitudinal trends across study phases to improve predictive accuracy.
 
 \end{document}
